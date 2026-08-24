@@ -1,85 +1,173 @@
 # 🎓 SKILLORA — Aprende. Practica. Evoluciona.
 
-> Plataforma de aprendizaje en línea moderna, educativa, tecnológica y amigable (LMS - Learning Management System) desarrollada con **React, Vite, Tailwind CSS, Framer Motion y Supabase**.
+> Plataforma LMS (*Learning Management System*) fullstack de alto rendimiento construida con una arquitectura profesional desacoplada: **Frontend en React 18 + Vite** y un **Backend propio en Node.js + Express + PostgreSQL + JWT + bcrypt + Zod**.
 
 ---
 
-## 🌟 Características Principales
+## 🏗️ Arquitectura del Sistema
 
-### 👨🎓 Experiencia del Estudiante
-- **Catálogo Interactivo**: Exploración de cursos con filtros combinados por Categoría (Desarrollo, Diseño, IA, Negocios, Marketing, Productividad), Nivel de dificultad, Duración y Criterios de ordenación.
-- **Detalle del Curso**: Ficha completa con temario desglosado por módulos y lecciones, objetivos clave, requisitos previos y perfil del instructor.
-- **Inscripción en 1-Click**: Sistema de inscripciones sin fricción con persistencia relacional (`enrollments`).
-- **Dashboard del Estudiante**: Resumen visual con curso actual en progreso, porcentaje completado, métricas (cursos inscritos, completados, horas aprendidas y certificados obtenidos).
-- **Aula Virtual / Reproductor Inmersivo (`/learn/:courseSlug/:lessonSlug`)**:
-  - Lecciones en **Video** (YouTube / MP4).
-  - Lecciones de **Artículo de Lectura** (Markdown formateado con snippets de código y botón de copiado).
-  - Lecciones de **Quiz Interactivo** integradas.
-  - Navegación fluida: `[← Anterior]`, `[Marcar como completada ✓]`, `[Siguiente →]`.
-  - Barra lateral colapsable y adaptable a móviles.
-- **Motor de Evaluaciones y Quizzes**:
-  - Preguntas de opción múltiple con avance paso a paso.
-  - Calificación instantánea con umbral de aprobación ($\ge 70\%$).
-  - Retroalimentación detallada con desglose de respuestas correctas/incorrectas y opción de reintento.
-- **Certificaciones Oficiales Verificables**:
-  - Generación automática de certificados oficiales con código único (`SKL-2026-XXXXX`).
-  - Animación de confeti y vistas verificables públicamente.
-  - Descarga instantánea en **PDF de alta resolución** o **PNG**.
-- **Gestión de Perfil**: Actualización de avatar, datos personales, biografía y consulta de historial académico.
-
----
-
-### 👨💼 Panel de Control Administrativo (`/admin`)
-- **Dashboard con Métricas Globales**: Total de estudiantes, cursos publicados, volumen de inscripciones y tasa de finalización.
-- **Gestión Completa de Cursos**:
-  - Creación y edición con campos detallados, objetivos y requisitos.
-  - Duplicación de cursos con 1 click.
-  - Publicación y despublicación en tiempo real.
-  - Eliminación con confirmación segura.
-- **Editor Visual de Módulos y Lecciones**:
-  - Creación y ordenación de módulos temáticos.
-  - Creación de lecciones de video, artículo y quiz.
-- **Constructor de Quizzes**:
-  - Creación de preguntas, opciones dinámicas y marcación visual de la respuesta correcta.
-  - Configuración del puntaje mínimo de aprobación.
-- **Gestión y Ficha Académica de Estudiantes**:
-  - Directorio de estudiantes registrados.
-  - Consulta de expedientes con cursos activos, progreso porcentual, historial de intentos y certificados emitidos.
-- **Gestión de Categorías**:
-  - Administración de áreas de conocimiento, iconos y descripción.
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      FRONTEND (SPA)                         │
+│   React 18 + Vite + Tailwind CSS + Framer Motion + Lucide   │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               │ HTTP / REST API
+                               │ Headers: Authorization: Bearer <JWT>
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      BACKEND (API REST)                     │
+│               Node.js + Express + ES Modules                │
+│                                                             │
+│  ├── 🔐 Autenticación & Autorización (JWT + bcryptjs)        │
+│  ├── 🛡️  Control de Acceso Basado en Roles (Student / Admin) │
+│  ├── ⚙️  Validación Estricta de Esquemas con Zod            │
+│  ├── 🚦 Rate Limiting en Endpoints Sensibles                │
+│  ├── 🧠 Lógica de Negocio & Motor de Evaluación Anti-Cheat  │
+│  └── 📜 Generación & Verificación de Certificados            │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               │ PostgreSQL Driver (pg.Pool)
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 BASE DE DATOS (PostgreSQL)                  │
+│       13 Tablas Relacionales + Índices de Rendimiento        │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 🛠️ Stack Tecnológico
+## 📁 Estructura del Proyecto
 
-| Capa | Tecnologías |
-| :--- | :--- |
-| **Frontend** | React 18, Vite, React Router DOM v6 |
-| **Estilos & UI** | Tailwind CSS, Lucide React, Framer Motion, Clsx, Tailwind Merge |
-| **Formularios & Validación** | React Hook Form, Zod, @hookform/resolvers |
-| **Certificados & Exportación** | jsPDF, html2canvas, canvas-confetti |
-| **Backend & Base de Datos** | Supabase (PostgreSQL, Row Level Security, Auth, Storage) |
-| **Modo Híbrido** | Soporte dual Supabase Live + Fallback offline con seed data completo en LocalStorage |
+```
+SKILLORA/
+├── frontend/                     # Aplicación Cliente React + Vite
+│   ├── public/
+│   ├── src/
+│   │   ├── components/           # Componentes UI, Cursos, Aula, Admin, Quizzes
+│   │   ├── contexts/             # AuthContext (JWT) y NotificationContext
+│   │   ├── pages/                # Vistas Públicas, Estudiante y Administrador
+│   │   ├── routes/               # AppRoutes, ProtectedRoute, AdminRoute
+│   │   ├── services/
+│   │   │   ├── apiClient.js      # Cliente HTTP centralizado con inyección de JWT
+│   │   │   ├── authService.js    # Auth, perfiles y usuarios demo
+│   │   │   ├── courseService.js  # Catálogo, cursos, módulos y lecciones
+│   │   │   ├── enrollmentService.js
+│   │   │   ├── progressService.js
+│   │   │   ├── quizService.js    # Consumo seguro de evaluaciones
+│   │   │   ├── certificateService.js
+│   │   │   └── adminService.js   # Métricas y fichas académicas
+│   │   ├── styles/               # Tailwind CSS y directivas
+│   │   ├── utils/                # Generadores de PDF/PNG y formateadores
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── package.json
+│   ├── vite.config.js
+│   └── tailwind.config.js
+│
+├── backend/                      # Servidor API REST Node.js + Express
+│   ├── src/
+│   │   ├── config/               # Variables de entorno y configuración
+│   │   ├── controllers/          # Controladores HTTP desacoplados
+│   │   ├── middleware/           # authMiddleware, roleMiddleware, errorMiddleware, validate
+│   │   ├── routes/               # Rutas modulares (/auth, /courses, /quizzes, etc.)
+│   │   ├── services/             # Lógica de negocio y persistencia
+│   │   ├── validators/           # Esquemas Zod para requests
+│   │   ├── utils/                # Hashing con bcrypt y sign/verify JWT
+│   │   ├── db/
+│   │   │   ├── database.js       # Pool PostgreSQL y modo resiliente
+│   │   │   ├── schema.sql        # DDL con 13 tablas relacionales e índices
+│   │   │   └── seed.js           # Script de sembrado de datos iniciales
+│   │   ├── app.js                # Configuración de Express, CORS y middlewares
+│   │   └── server.js             # Punto de entrada HTTP
+│   ├── package.json
+│   ├── .env.example
+│   └── .env
+│
+├── package.json                  # Scripts coordinados del repositorio
+└── README.md
+```
 
 ---
 
-## 🗄️ Esquema de Base de Datos (13 Tablas)
+## 🔌 Colección de Endpoints REST API
 
-El proyecto incluye scripts SQL completos en `supabase/schema.sql` y `supabase/seed.sql`:
+### 🔐 Autenticación (`/api/auth`)
+| Método | Endpoint | Acceso | Descripción |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/register` | Público | Registra nuevo estudiante (`role: 'student'`) y devuelve JWT |
+| `POST` | `/api/auth/login` | Público | Valida credenciales con `bcrypt.compare` y entrega JWT |
+| `GET` | `/api/auth/me` | Autenticado | Obtiene perfil del usuario activo a partir del token JWT |
+| `PUT` | `/api/auth/profile` | Autenticado | Actualiza datos del perfil (nombre, avatar, teléfono, bio) |
+| `POST` | `/api/auth/forgot-password` | Público | Solicita restablecimiento de contraseña |
 
-1. `profiles` — Perfiles de usuario (roles `student` y `admin`).
-2. `categories` — Categorías temáticas de cursos.
-3. `courses` — Catálogo de cursos con niveles, duración y estado (`draft`, `published`, `archived`).
-4. `course_modules` — Módulos temáticos por curso.
-5. `lessons` — Lecciones individuales (`video`, `article`, `quiz`).
-6. `enrollments` — Inscripciones únicas por estudiante y curso.
-7. `lesson_progress` — Registro granular de lecciones completadas.
-8. `quizzes` — Evaluaciones vinculadas a lecciones.
-9. `quiz_questions` — Preguntas de opción múltiple.
-10. `quiz_options` — Alternativas de respuesta con indicador de acierto.
-11. `quiz_attempts` — Historial de intentos con puntuación y estado de aprobación.
-12. `quiz_answers` — Respuestas detalladas por intento.
-13. `certificates` — Certificados emitidos con código único de validación.
+### 📚 Cursos y Temarios (`/api/courses`)
+| Método | Endpoint | Acceso | Descripción |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/courses` | Público | Lista cursos con filtros (categoría, nivel, duración, búsqueda, orden) |
+| `GET` | `/api/courses/:slug` | Público | Detalle completo de curso con módulos y lecciones |
+| `POST` | `/api/courses` | **Admin** | Crea un nuevo curso |
+| `PUT` | `/api/courses/:id` | **Admin** | Actualiza metadatos y configuración del curso |
+| `DELETE` | `/api/courses/:id` | **Admin** | Elimina curso |
+| `POST` | `/api/courses/:id/duplicate` | **Admin** | Duplica un curso y su estructura de contenido |
+| `POST` | `/api/courses/:id/modules` | **Admin** | Guarda el árbol completo de módulos y lecciones |
+
+### 🏷️ Categorías (`/api/categories`)
+| Método | Endpoint | Acceso | Descripción |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/categories` | Público | Lista todas las categorías del catálogo |
+| `POST` | `/api/categories` | **Admin** | Crea o edita una categoría |
+| `DELETE` | `/api/categories/:id` | **Admin** | Elimina una categoría |
+
+### 📝 Inscripciones & Progreso
+| Método | Endpoint | Acceso | Descripción |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/courses/:courseId/enroll` | Autenticado | Inscribe al estudiante en un curso |
+| `GET` | `/api/me/courses` | Autenticado | Lista los cursos inscritos con porcentajes de avance |
+| `GET` | `/api/me/courses/:courseId` | Autenticado | Verifica estado de inscripción |
+| `POST` | `/api/lessons/:lessonId/complete` | Autenticado | Marca lección como completada |
+| `DELETE` | `/api/lessons/:lessonId/complete` | Autenticado | Desmarca lección |
+| `GET` | `/api/courses/:courseId/progress` | Autenticado | Calcula porcentaje, lecciones vistas y última lección |
+
+### 🧠 Evaluaciones & Quizzes (`/api/quizzes`)
+| Método | Endpoint | Acceso | Descripción |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/quizzes/:id` | Público | Obtiene preguntas del quiz (**`is_correct` nunca viaja al cliente**) |
+| `POST` | `/api/quizzes/:id/submit` | Autenticado | Envía respuestas; el servidor evalúa, puntúa y registra intento |
+| `GET` | `/api/quizzes/:id/attempts` | Autenticado | Historial de intentos del usuario |
+| `POST` | `/api/quizzes` | **Admin** | Crea o actualiza evaluación con respuestas correctas |
+
+### 📜 Certificados (`/api/certificates`)
+| Método | Endpoint | Acceso | Descripción |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/certificates` | Autenticado | Lista certificados obtenidos por el usuario |
+| `GET` | `/api/certificates/:code` | Público | Verificación pública mediante código oficial `SKL-YYYY-XXXXX` |
+| `POST` | `/api/certificates` | Autenticado | Emite certificado tras validar 100% de lecciones + quiz aprobado |
+
+### 👨💼 Panel de Administración (`/api/admin`)
+| Método | Endpoint | Acceso | Descripción |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/admin/dashboard` | **Admin** | Estadísticas globales (estudiantes, cursos, inscripciones, completados) |
+| `GET` | `/api/admin/students` | **Admin** | Directorio de alumnos registrados con métricas académicas |
+| `GET` | `/api/admin/students/:id` | **Admin** | Ficha académica detallada de un estudiante con historial |
+
+---
+
+## 🗄️ Modelo de Datos PostgreSQL (13 Tablas)
+
+1. `users`: Identidad, credenciales (`password_hash`), roles (`student`, `admin`), avatar y biografía.
+2. `categories`: Áreas de conocimiento y slugs de filtrado.
+3. `courses`: Catálogo con metadatos, nivel, duración, estado (`draft`, `published`, `archived`) y JSON de objetivos/requisitos.
+4. `course_modules`: Módulos temáticos por curso ordenados por `order_index`.
+5. `lessons`: Lecciones (`video`, `article`, `quiz`) con contenido, URL y duración.
+6. `enrollments`: Inscripciones con restricción `UNIQUE(user_id, course_id)`.
+7. `lesson_progress`: Progreso granular con restricción `UNIQUE(user_id, lesson_id)`.
+8. `quizzes`: Cuestionarios vinculados con puntaje de aprobación (`passing_score`).
+9. `quiz_questions`: Preguntas por evaluación.
+10. `quiz_options`: Opciones con indicador protegido `is_correct`.
+11. `quiz_attempts`: Historial de calificaciones y estado de aprobación.
+12. `quiz_answers`: Registro de opciones elegidas y aciertos calculados en servidor.
+13. `certificates`: Certificados oficiales con restricción `UNIQUE(certificate_code)`.
 
 ---
 
@@ -93,49 +181,57 @@ cd SKILLORA
 
 ### 2. Instalar dependencias
 ```bash
-npm install
+# Instalar todo en frontend y backend
+npm run install:all
 ```
 
-### 3. Configurar variables de entorno (Opcional)
-Copia el archivo `.env.example` a `.env`:
-```bash
-cp .env.example .env
-```
-Configura tus credenciales de Supabase:
+### 3. Configurar Variables de Entorno
+
+**Backend (`backend/.env`):**
 ```env
-VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
-VITE_SUPABASE_ANON_KEY=tu-anon-key-aqui
+PORT=4000
+NODE_ENV=development
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/skillora
+JWT_SECRET=skillora_super_secure_jwt_secret_key_2026_edu
+JWT_EXPIRES_IN=7d
+FRONTEND_URL=http://localhost:3000,http://localhost:5173
 ```
 
-> **Nota**: Si no configuras Supabase, Skillora funcionará inmediatamente en **Modo Local Híbrido** con datos precargados realistas y persistencia en el navegador.
-
-### 4. Iniciar el servidor de desarrollo
-```bash
-npm run dev
+**Frontend (`frontend/.env`):**
+```env
+VITE_API_URL=http://localhost:4000/api
 ```
 
-Abre en tu navegador: [http://localhost:3000](http://localhost:3000)
-
-### 5. Compilar para Producción
+### 4. Sembrar la Base de Datos
 ```bash
-npm run build
+npm run seed
+```
+
+### 5. Iniciar Servidores de Desarrollo
+
+**Terminal 1 — Backend API:**
+```bash
+npm run dev:backend
+# Servidor escuchando en http://localhost:4000/api
+```
+
+**Terminal 2 — Frontend SPA:**
+```bash
+npm run dev:frontend
+# Aplicación lista en http://localhost:3000
 ```
 
 ---
 
 ## 👥 Cuentas Demo para Evaluación Rápida
 
-La aplicación cuenta con botones de acceso rápido de 1-click en la barra superior y en `/login`:
+La aplicación cuenta con botones de **1-Click Demo** en la barra superior:
 
-- **👨🎓 Estudiante Demo**:
-  - Email: `estudiante@skillora.edu`
-  - Contraseña: `password123`
-- **👨💼 Administrador Demo**:
-  - Email: `admin@skillora.edu`
-  - Contraseña: `adminpassword`
+- 👨🎓 **Estudiante Demo**: `estudiante@skillora.edu` / `password123`
+- 👨💼 **Administrador Demo**: `admin@skillora.edu` / `adminpassword`
 
 ---
 
 ## 📄 Licencia
 
-Este proyecto se distribuye bajo la licencia MIT. Diseñado para la comunidad de desarrolladores y estudiantes.
+MIT License — Creado como plataforma LMS educativa moderna y modular.
