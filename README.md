@@ -128,9 +128,9 @@ SKILLORA/
 │   │   ├── app.js                # Configuración de Express, CORS y middlewares
 │   │   └── server.js             # Punto de entrada del servidor en puerto 4000
 │   ├── package.json
-│   ├── .env.example
-│   └── .env
+│   └── .env.example
 │
+├── .gitignore                    # Reglas de exclusión (ignora node_modules, dist y archivos .env)
 ├── package.json                  # Scripts raíz para coordinar frontend y backend
 └── README.md
 ```
