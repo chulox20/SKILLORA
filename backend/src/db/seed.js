@@ -416,7 +416,7 @@ export async function seedInitialData() {
         `INSERT INTO quiz_questions (id, quiz_id, question, order_index)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (id) DO UPDATE SET question = EXCLUDED.question`,
-        [q, 'quiz-react-1', q.question, qIdx + 1]
+        [q.id, 'quiz-react-1', q.question, qIdx + 1]
       );
 
       for (const [optIdx, opt] of q.options.entries()) {
