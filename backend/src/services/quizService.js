@@ -1,7 +1,5 @@
-import { pool, isDbConnected } from '../db/database.js';
-
-let inMemoryQuizzes = [];
-let inMemoryAttempts = [];
+import crypto from 'crypto';
+import { query } from '../db/database.js';
 
 export const quizService = {
   // Get Quiz for Student (Section 30: NEVER sends is_correct to frontend)
@@ -9,7 +7,7 @@ export const quizService = {
     const fullQuiz = await this.getFullQuizById(id);
     if (!fullQuiz) return null;
 
-    // Sanitize: strip out is_correct for public consumer
+    // Sanitize: strip out is_correct for student consumption
     return {
       id: fullQuiz.id,
       lesson_id: fullQuiz.lesson_id,
@@ -29,35 +27,31 @@ export const quizService = {
     };
   },
 
-  // Internal: Get Quiz with correct answers for backend validation or admin
+  // Internal: Get Quiz with correct answers for server-side evaluation or admin
   async getFullQuizById(id) {
-    if (isDbConnected()) {
-      const quizRes = await pool.query(`SELECT * FROM quizzes WHERE id = $1 OR lesson_id = $1`, [id]);
-      const quiz = quizRes.rows[0];
-      if (!quiz) return null;
+    const quizRes = await query(`SELECT * FROM quizzes WHERE id = $1 OR lesson_id = $1`, [id]);
+    const quiz = quizRes.rows[0];
+    if (!quiz) return null;
 
-      const questionsRes = await pool.query(
-        `SELECT * FROM quiz_questions WHERE quiz_id = $1 ORDER BY order_index ASC`,
-        [quiz.id]
+    const questionsRes = await query(
+      `SELECT * FROM quiz_questions WHERE quiz_id = $1 ORDER BY order_index ASC`,
+      [quiz.id]
+    );
+    const questions = questionsRes.rows;
+
+    for (const q of questions) {
+      const optionsRes = await query(
+        `SELECT * FROM quiz_options WHERE question_id = $1 ORDER BY order_index ASC`,
+        [q.id]
       );
-      const questions = questionsRes.rows;
-
-      for (const q of questions) {
-        const optionsRes = await pool.query(
-          `SELECT * FROM quiz_options WHERE question_id = $1 ORDER BY order_index ASC`,
-          [q.id]
-        );
-        q.options = optionsRes.rows;
-      }
-
-      quiz.questions = questions;
-      return quiz;
+      q.options = optionsRes.rows;
     }
 
-    return inMemoryQuizzes.find((q) => q.id === id || q.lesson_id === id) || null;
+    quiz.questions = questions;
+    return quiz;
   },
 
-  // Submit Quiz Attempt (Section 31)
+  // Submit Quiz Attempt (Section 31: Evaluated and graded strictly on server)
   async submitQuizAttempt(quizId, userId, answers = []) {
     const fullQuiz = await this.getFullQuizById(quizId);
     if (!fullQuiz) {
@@ -103,10 +97,26 @@ export const quizService = {
 
     const score = Math.round((correctCount / totalCount) * 100);
     const passed = score >= (fullQuiz.passing_score || 70);
-    const attemptId = `att-${Date.now()}`;
+    const attemptId = `att-${crypto.randomUUID()}`;
     const completedAt = new Date().toISOString();
 
-    const attempt = {
+    await query(
+      `INSERT INTO quiz_attempts (id, quiz_id, user_id, score, passed, completed_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [attemptId, fullQuiz.id, userId, score, passed, completedAt]
+    );
+
+    for (const ans of detailedAnswers) {
+      if (ans.selected_option_id) {
+        await query(
+          `INSERT INTO quiz_answers (id, attempt_id, question_id, selected_option_id, is_correct)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [`ans-${crypto.randomUUID()}`, attemptId, ans.question_id, ans.selected_option_id, ans.is_correct]
+        );
+      }
+    }
+
+    return {
       id: attemptId,
       quiz_id: fullQuiz.id,
       user_id: userId,
@@ -117,87 +127,51 @@ export const quizService = {
       detailedAnswers,
       completed_at: completedAt,
     };
-
-    if (isDbConnected()) {
-      await pool.query(
-        `INSERT INTO quiz_attempts (id, quiz_id, user_id, score, passed, completed_at)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [attemptId, fullQuiz.id, userId, score, passed, completedAt]
-      );
-
-      for (const ans of detailedAnswers) {
-        if (ans.selected_option_id) {
-          await pool.query(
-            `INSERT INTO quiz_answers (id, attempt_id, question_id, selected_option_id, is_correct)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [`ans-${Date.now()}-${Math.random()}`, attemptId, ans.question_id, ans.selected_option_id, ans.is_correct]
-          );
-        }
-      }
-    }
-
-    inMemoryAttempts.push(attempt);
-    return attempt;
   },
 
   // Get attempts for user
   async getUserAttempts(quizId, userId) {
-    if (isDbConnected()) {
-      const result = await pool.query(
-        `SELECT * FROM quiz_attempts WHERE quiz_id = $1 AND user_id = $2 ORDER BY completed_at DESC`,
-        [quizId, userId]
-      );
-      return result.rows;
-    }
-    return inMemoryAttempts.filter((a) => a.quiz_id === quizId && a.user_id === userId);
+    const result = await query(
+      `SELECT * FROM quiz_attempts WHERE quiz_id = $1 AND user_id = $2 ORDER BY completed_at DESC`,
+      [quizId, userId]
+    );
+    return result.rows;
   },
 
   // Save Quiz (Admin)
   async saveQuiz(quizData) {
-    const quizId = quizData.id || `quiz-${Date.now()}`;
+    const quizId = quizData.id || `quiz-${crypto.randomUUID()}`;
 
-    if (isDbConnected()) {
-      await pool.query(
-        `INSERT INTO quizzes (id, lesson_id, course_id, title, passing_score)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (id) DO UPDATE
-         SET title = EXCLUDED.title,
-             passing_score = EXCLUDED.passing_score`,
-        [quizId, quizData.lessonId || null, quizData.courseId || null, quizData.title, quizData.passingScore || 70]
+    await query(
+      `INSERT INTO quizzes (id, lesson_id, course_id, title, passing_score)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (id) DO UPDATE
+       SET title = EXCLUDED.title,
+           passing_score = EXCLUDED.passing_score`,
+      [quizId, quizData.lessonId || null, quizData.courseId || null, quizData.title, quizData.passingScore || 70]
+    );
+
+    // Re-insert questions & options
+    await query(`DELETE FROM quiz_questions WHERE quiz_id = $1`, [quizId]);
+
+    for (const [qIdx, q] of (quizData.questions || []).entries()) {
+      const qId = q.id || `q-${crypto.randomUUID()}`;
+      await query(
+        `INSERT INTO quiz_questions (id, quiz_id, question, order_index)
+         VALUES ($1, $2, $3, $4)`,
+        [qId, quizId, q.question, qIdx + 1]
       );
 
-      // Re-insert questions & options
-      await pool.query(`DELETE FROM quiz_questions WHERE quiz_id = $1`, [quizId]);
-
-      for (const [qIdx, q] of (quizData.questions || []).entries()) {
-        const qId = q.id || `q-${Date.now()}-${qIdx}`;
-        await pool.query(
-          `INSERT INTO quiz_questions (id, quiz_id, question, order_index)
-           VALUES ($1, $2, $3, $4)`,
-          [qId, quizId, q.question, qIdx + 1]
+      for (const [optIdx, opt] of (q.options || []).entries()) {
+        const optId = opt.id || `opt-${crypto.randomUUID()}`;
+        await query(
+          `INSERT INTO quiz_options (id, question_id, option_text, is_correct, order_index)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [optId, qId, opt.option_text || opt.text, opt.is_correct || false, optIdx + 1]
         );
-
-        for (const [optIdx, opt] of (q.options || []).entries()) {
-          const optId = opt.id || `opt-${Date.now()}-${optIdx}`;
-          await pool.query(
-            `INSERT INTO quiz_options (id, question_id, option_text, is_correct, order_index)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [optId, qId, opt.option_text || opt.text, opt.is_correct || false, optIdx + 1]
-          );
-        }
       }
     }
 
-    const idx = inMemoryQuizzes.findIndex((q) => q.id === quizId);
-    const formatted = { id: quizId, ...quizData };
-    if (idx !== -1) inMemoryQuizzes[idx] = formatted;
-    else inMemoryQuizzes.push(formatted);
-    return formatted;
-  },
-
-  seedQuiz(quiz) {
-    const idx = inMemoryQuizzes.findIndex((q) => q.id === quiz.id);
-    if (idx !== -1) inMemoryQuizzes[idx] = quiz;
-    else inMemoryQuizzes.push(quiz);
+    return { id: quizId, ...quizData };
   },
 };

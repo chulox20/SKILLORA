@@ -8,7 +8,7 @@ export const pool = new Pool({
   connectionString: config.databaseUrl,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 3000,
+  connectionTimeoutMillis: 5000,
 });
 
 let isPostgresConnected = false;
@@ -24,7 +24,11 @@ export async function testDbConnection() {
     return true;
   } catch (err) {
     isPostgresConnected = false;
-    console.warn(`⚠️ [Database] Could not connect to PostgreSQL at ${config.databaseUrl} (${err.message}). Running in Resilient Memory Mode for active REST endpoints.`);
+    console.error(`❌ [Database Error] Could not connect to PostgreSQL at ${config.databaseUrl}: ${err.message}`);
+    // In production or strict mode, connection failure should not be silenced
+    if (config.nodeEnv === 'production') {
+      throw new Error(`[Database Error] Failed to connect to PostgreSQL: ${err.message}`);
+    }
     return false;
   }
 }
@@ -33,15 +37,14 @@ export function isDbConnected() {
   return isPostgresConnected;
 }
 
-// Generic query helper with auto-fallback to in-memory store if DB is offline
+// Database query executor (Throws 503 if database connection is unavailable)
 export async function query(text, params = []) {
-  if (isPostgresConnected) {
-    try {
-      return await pool.query(text, params);
-    } catch (err) {
-      console.error('PostgreSQL query error:', err.message);
-      throw err;
-    }
+  try {
+    return await pool.query(text, params);
+  } catch (err) {
+    const dbErr = new Error(`Error de base de datos: ${err.message}`);
+    dbErr.statusCode = 503;
+    dbErr.originalError = err;
+    throw dbErr;
   }
-  return { rows: [] };
 }

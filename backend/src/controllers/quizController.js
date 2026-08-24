@@ -1,27 +1,42 @@
 import { quizService } from '../services/quizService.js';
 import { certificateService } from '../services/certificateService.js';
+import { enrollmentService } from '../services/enrollmentService.js';
 
 export const quizController = {
-  // GET /api/quizzes/:id (Section 30: NEVER sends is_correct to browser)
+  // GET /api/quizzes/:id (Authenticated + Enrolled requirement, Point 5)
   async getById(req, res, next) {
     try {
-      const quiz = await quizService.getQuizById(req.params.id);
-      if (!quiz) {
+      const fullQuiz = await quizService.getFullQuizById(req.params.id);
+      if (!fullQuiz) {
         return res.status(404).json({
           success: false,
           message: 'Evaluación no encontrada.',
         });
       }
+
+      // Check if user is enrolled or admin
+      if (req.user.role !== 'admin' && fullQuiz.course_id) {
+        const isEnrolled = await enrollmentService.isEnrolled(req.user.id, fullQuiz.course_id);
+        if (!isEnrolled) {
+          return res.status(403).json({
+            success: false,
+            message: 'Debes estar inscrito en este curso para acceder a la evaluación.',
+          });
+        }
+      }
+
+      // Sanitize: never send is_correct to student
+      const sanitizedQuiz = await quizService.getQuizById(req.params.id);
       res.json({
         success: true,
-        data: quiz,
+        data: sanitizedQuiz,
       });
     } catch (err) {
       next(err);
     }
   },
 
-  // POST /api/quizzes/:id/submit (Section 31: Evaluates and grades on server)
+  // POST /api/quizzes/:id/submit (Evaluates on server + anti-cheat)
   async submit(req, res, next) {
     try {
       const { id } = req.params;
@@ -29,13 +44,13 @@ export const quizController = {
 
       const result = await quizService.submitQuizAttempt(id, req.user.id, answers);
 
-      // If passed and courseId provided, issue certificate automatically
+      // If passed and courseId provided, attempt automatic certificate issuance if all conditions are met
       let certificate = null;
       if (result.passed && courseId) {
         try {
           certificate = await certificateService.issueCertificate(req.user.id, courseId);
         } catch (certErr) {
-          // If course is not 100% complete yet, certificate won't be created until lessons are completed
+          // If lessons are not yet 100% completed, certificate issuance waits until course is complete
         }
       }
 

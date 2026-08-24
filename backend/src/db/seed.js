@@ -1,136 +1,197 @@
-import { pool, isDbConnected } from './database.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { query } from './database.js';
 import { hashPassword } from '../utils/password.js';
-import { authService } from '../services/authService.js';
-import { courseService } from '../services/courseService.js';
-import { quizService } from '../services/quizService.js';
-import { enrollmentService } from '../services/enrollmentService.js';
-import { progressService } from '../services/progressService.js';
-import { certificateService } from '../services/certificateService.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export async function seedInitialData() {
-  console.log('🌱 [Seed] Preparing seed dataset...');
+  console.log('🌱 [Seed] Initializing PostgreSQL database tables and seeds...');
 
-  // 1. Password hashes
-  const adminHash = await hashPassword('adminpassword');
-  const studentHash = await hashPassword('password123');
+  try {
+    // 1. Execute schema.sql to ensure all 13 tables & indexes exist
+    const schemaPath = path.join(__dirname, 'schema.sql');
+    if (fs.existsSync(schemaPath)) {
+      const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+      await query(schemaSql);
+      console.log('✅ [Seed] Database schema and tables verified.');
+    }
 
-  // 2. Demo Users
-  const adminUser = {
-    id: 'user-admin-1',
-    full_name: 'Administrador Skillora',
-    email: 'admin@skillora.edu',
-    password_hash: adminHash,
-    avatar_url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-    role: 'admin',
-    phone: '+1 (555) 999-0000',
-    bio: 'Director de contenidos y curador académico en Skillora.',
-    created_at: new Date().toISOString(),
-  };
+    // 2. Demo Users
+    const adminHash = await hashPassword('adminpassword');
+    const studentHash = await hashPassword('password123');
 
-  const studentUser = {
-    id: 'user-student-1',
-    full_name: 'Jesús Figueroa',
-    email: 'estudiante@skillora.edu',
-    password_hash: studentHash,
-    avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-    role: 'student',
-    phone: '+1 (555) 234-5678',
-    bio: 'Estudiante apasionado por el desarrollo web y React.',
-    created_at: new Date().toISOString(),
-  };
+    await query(
+      `INSERT INTO users (id, full_name, email, password_hash, avatar_url, role, phone, bio)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (id) DO UPDATE
+       SET password_hash = EXCLUDED.password_hash,
+           role = EXCLUDED.role`,
+      [
+        'user-admin-1',
+        'Administrador Skillora',
+        'admin@skillora.edu',
+        adminHash,
+        'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+        'admin',
+        '+1 (555) 999-0000',
+        'Director de contenidos y curador académico en Skillora.',
+      ]
+    );
 
-  authService.seedUser(adminUser);
-  authService.seedUser(studentUser);
+    await query(
+      `INSERT INTO users (id, full_name, email, password_hash, avatar_url, role, phone, bio)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (id) DO UPDATE
+       SET password_hash = EXCLUDED.password_hash,
+           role = EXCLUDED.role`,
+      [
+        'user-student-1',
+        'Jesús Figueroa',
+        'estudiante@skillora.edu',
+        studentHash,
+        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+        'student',
+        '+1 (555) 234-5678',
+        'Estudiante apasionado por el desarrollo web y React.',
+      ]
+    );
 
-  // 3. Categories
-  const categories = [
-    {
-      id: 'cat-1',
-      name: 'Desarrollo',
-      slug: 'desarrollo',
-      description: 'Aprende frontend, backend, frameworks modernos y desarrollo web fullstack.',
-      image_url: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80',
-      icon: 'Code2',
-    },
-    {
-      id: 'cat-2',
-      name: 'Diseño',
-      slug: 'diseno',
-      description: 'Domina UI/UX, Figma, sistemas de diseño y prototipado profesional.',
-      image_url: 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=600&auto=format&fit=crop&q=80',
-      icon: 'Palette',
-    },
-    {
-      id: 'cat-3',
-      name: 'Negocios',
-      slug: 'negocios',
-      description: 'Estrategias de emprendimiento, finanzas, modelos de negocio y liderazgo.',
-      image_url: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=80',
-      icon: 'Briefcase',
-    },
-    {
-      id: 'cat-4',
-      name: 'Marketing',
-      slug: 'marketing',
-      description: 'Growth hacking, SEO, redes sociales, embudos de venta y copywriting.',
-      image_url: 'https://images.unsplash.com/photo-1432888622747-4eb9a8f2c293?w=600&auto=format&fit=crop&q=80',
-      icon: 'Megaphone',
-    },
-    {
-      id: 'cat-5',
-      name: 'Inteligencia Artificial',
-      slug: 'ia',
-      description: 'Machine Learning, LLMs, prompt engineering y automatización con IA.',
-      image_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
-      icon: 'Brain',
-    },
-    {
-      id: 'cat-6',
-      name: 'Productividad',
-      slug: 'productividad',
-      description: 'Gestión de proyectos, hábitos efectivos, Notion, metodologías ágiles y foco.',
-      image_url: 'https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=600&auto=format&fit=crop&q=80',
-      icon: 'TrendingUp',
-    },
-  ];
+    // 3. Categories
+    const categories = [
+      {
+        id: 'cat-1',
+        name: 'Desarrollo',
+        slug: 'desarrollo',
+        description: 'Aprende frontend, backend, frameworks modernos y desarrollo web fullstack.',
+        image_url: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80',
+        icon: 'Code2',
+      },
+      {
+        id: 'cat-2',
+        name: 'Diseño',
+        slug: 'diseno',
+        description: 'Domina UI/UX, Figma, sistemas de diseño y prototipado profesional.',
+        image_url: 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=600&auto=format&fit=crop&q=80',
+        icon: 'Palette',
+      },
+      {
+        id: 'cat-3',
+        name: 'Negocios',
+        slug: 'negocios',
+        description: 'Estrategias de emprendimiento, finanzas, modelos de negocio y liderazgo.',
+        image_url: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=80',
+        icon: 'Briefcase',
+      },
+      {
+        id: 'cat-4',
+        name: 'Marketing',
+        slug: 'marketing',
+        description: 'Growth hacking, SEO, redes sociales, embudos de venta y copywriting.',
+        image_url: 'https://images.unsplash.com/photo-1432888622747-4eb9a8f2c293?w=600&auto=format&fit=crop&q=80',
+        icon: 'Megaphone',
+      },
+      {
+        id: 'cat-5',
+        name: 'Inteligencia Artificial',
+        slug: 'ia',
+        description: 'Machine Learning, LLMs, prompt engineering y automatización con IA.',
+        image_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
+        icon: 'Brain',
+      },
+      {
+        id: 'cat-6',
+        name: 'Productividad',
+        slug: 'productividad',
+        description: 'Gestión de proyectos, hábitos efectivos, Notion, metodologías ágiles y foco.',
+        image_url: 'https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=600&auto=format&fit=crop&q=80',
+        icon: 'TrendingUp',
+      },
+    ];
 
-  categories.forEach((cat) => courseService.seedCategory(cat));
+    for (const cat of categories) {
+      await query(
+        `INSERT INTO categories (id, name, slug, description, image_url, icon)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id) DO UPDATE
+         SET name = EXCLUDED.name,
+             slug = EXCLUDED.slug,
+             description = EXCLUDED.description,
+             image_url = EXCLUDED.image_url,
+             icon = EXCLUDED.icon`,
+        [cat.id, cat.name, cat.slug, cat.description, cat.image_url, cat.icon]
+      );
+    }
 
-  // 4. Courses with full syllabus
-  const reactCourse = {
-    id: 'course-1',
-    category_id: 'cat-1',
-    category_name: 'Desarrollo Web',
-    title: 'React desde cero',
-    slug: 'react-desde-cero',
-    short_description: 'Domina React 19 construyendo aplicaciones interactivas y proyectos reales paso a paso.',
-    description:
-      'Aprende los fundamentos y conceptos avanzados de React. Comprende el Virtual DOM, domina los Hooks fundamentales (useState, useEffect, useMemo, useRef), gestiona el estado global y construye una aplicación completa lista para producción.',
-    thumbnail_url: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&auto=format&fit=crop&q=80',
-    level: 'beginner',
-    duration: '6h 30m',
-    rating: 4.9,
-    reviews_count: 128,
-    students_count: 245,
-    status: 'published',
-    objectives: [
-      'Componentes React y arquitectura declarativa',
-      'Hooks esenciales (useState, useEffect, useRef, useMemo)',
-      'Gestión de estado local y global',
-      'Routing dinámico con React Router',
-      'Consumo de APIs asíncronas',
-      'Proyecto final con despliegue en producción',
-    ],
-    requirements: [
-      'Conocimientos básicos de HTML, CSS y JavaScript (ES6+)',
-      'Computadora con Node.js y editor de código',
-    ],
-    instructor: {
-      name: 'Carlos Mendoza',
-      role: 'Senior Frontend Architect',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    },
-    modules: [
+    // 4. Main Course: React desde cero
+    const reactCourse = {
+      id: 'course-1',
+      category_id: 'cat-1',
+      category_name: 'Desarrollo Web',
+      title: 'React desde cero',
+      slug: 'react-desde-cero',
+      short_description: 'Domina React 19 construyendo aplicaciones interactivas y proyectos reales paso a paso.',
+      description: 'Aprende los fundamentos y conceptos avanzados de React. Comprende el Virtual DOM, domina los Hooks fundamentales (useState, useEffect, useMemo, useRef), gestiona el estado global y construye una aplicación completa lista para producción.',
+      thumbnail_url: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&auto=format&fit=crop&q=80',
+      level: 'beginner',
+      duration: '6h 30m',
+      rating: 4.90,
+      reviews_count: 128,
+      students_count: 245,
+      status: 'published',
+      objectives: [
+        'Componentes React y arquitectura declarativa',
+        'Hooks esenciales (useState, useEffect, useRef, useMemo)',
+        'Gestión de estado local y global',
+        'Routing dinámico con React Router',
+        'Consumo de APIs asíncronas',
+        'Proyecto final con despliegue en producción',
+      ],
+      requirements: [
+        'Conocimientos básicos de HTML, CSS y JavaScript (ES6+)',
+        'Computadora con Node.js y editor de código',
+      ],
+      instructor: {
+        name: 'Carlos Mendoza',
+        role: 'Senior Frontend Architect',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      },
+    };
+
+    await query(
+      `INSERT INTO courses (id, category_id, category_name, title, slug, short_description, description, thumbnail_url, level, duration, rating, reviews_count, students_count, status, objectives, requirements, instructor)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       ON CONFLICT (id) DO UPDATE
+       SET title = EXCLUDED.title,
+           slug = EXCLUDED.slug,
+           short_description = EXCLUDED.short_description,
+           description = EXCLUDED.description,
+           thumbnail_url = EXCLUDED.thumbnail_url`,
+      [
+        reactCourse.id,
+        reactCourse.category_id,
+        reactCourse.category_name,
+        reactCourse.title,
+        reactCourse.slug,
+        reactCourse.short_description,
+        reactCourse.description,
+        reactCourse.thumbnail_url,
+        reactCourse.level,
+        reactCourse.duration,
+        reactCourse.rating,
+        reactCourse.reviews_count,
+        reactCourse.students_count,
+        reactCourse.status,
+        JSON.stringify(reactCourse.objectives),
+        JSON.stringify(reactCourse.requirements),
+        JSON.stringify(reactCourse.instructor),
+      ]
+    );
+
+    // 5. Modules & Lessons
+    const modules = [
       {
         id: 'mod-1',
         course_id: 'course-1',
@@ -148,7 +209,7 @@ export async function seedInitialData() {
             video_url: 'https://www.youtube.com/watch?v=w7ejDZ8SWv8',
             duration: '15 min',
             order_index: 1,
-            content: 'En esta primera lección cubrimos la arquitectura de React y configuramos nuestro entorno con Node.js y Express.',
+            content: 'En esta primera lección cubrimos la arquitectura de React y configuramos nuestro entorno.',
           },
           {
             id: 'les-1-2',
@@ -159,25 +220,7 @@ export async function seedInitialData() {
             type: 'article',
             duration: '20 min',
             order_index: 2,
-            content: `# ¿Qué es React y el Virtual DOM?
-
-React es una librería de JavaScript declarativa y eficiente para construir interfaces de usuario.
-
-### Principios Clave:
-1. **Basado en Componentes**: Cada parte de la UI es una función reutilizable.
-2. **Virtual DOM**: Representación en memoria que minimiza mutaciones costosas en el DOM real.
-3. **Flujo de datos unidireccional**: Los datos fluyen de padres a hijos a través de props.
-
-\`\`\`jsx
-function WelcomeCard({ name }) {
-  return (
-    <div className="card">
-      <h2>¡Bienvenido, {name}!</h2>
-    </div>
-  );
-}
-\`\`\`
-`,
+            content: '# ¿Qué es React y el Virtual DOM?\n\nReact es una librería de JavaScript declarativa y eficiente para construir interfaces de usuario.',
           },
           {
             id: 'les-1-3',
@@ -219,21 +262,7 @@ function WelcomeCard({ name }) {
             type: 'article',
             duration: '20 min',
             order_index: 2,
-            content: `# Manejo de Eventos en React
-
-React utiliza Synthetic Events para asegurar compatibilidad en todos los navegadores.
-
-\`\`\`jsx
-function Counter() {
-  const [count, setCount] = React.useState(0);
-  return (
-    <button onClick={() => setCount(c => c + 1)}>
-      Clicks: {count}
-    </button>
-  );
-}
-\`\`\`
-`,
+            content: '# Manejo de Eventos en React\n\nReact utiliza Synthetic Events para asegurar compatibilidad en todos los navegadores.',
           },
           {
             id: 'les-2-3',
@@ -279,101 +308,155 @@ function Counter() {
           },
         ],
       },
-    ],
-  };
+    ];
 
-  courseService.seedCourse(reactCourse);
+    for (const mod of modules) {
+      await query(
+        `INSERT INTO course_modules (id, course_id, title, description, order_index)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (id) DO UPDATE
+         SET title = EXCLUDED.title,
+             description = EXCLUDED.description`,
+        [mod.id, mod.course_id, mod.title, mod.description, mod.order_index]
+      );
 
-  // 5. Quiz with SECURE correct answers stored on server
-  const reactQuiz = {
-    id: 'quiz-react-1',
-    lesson_id: 'les-3-2',
-    course_id: 'course-1',
-    title: 'Evaluación de Certificación: React desde Cero',
-    passing_score: 70,
-    questions: [
+      for (const les of mod.lessons) {
+        await query(
+          `INSERT INTO lessons (id, module_id, title, slug, description, type, content, video_url, duration, order_index, quiz_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           ON CONFLICT (id) DO UPDATE
+           SET title = EXCLUDED.title,
+               slug = EXCLUDED.slug,
+               type = EXCLUDED.type,
+               video_url = EXCLUDED.video_url,
+               content = EXCLUDED.content,
+               quiz_id = EXCLUDED.quiz_id`,
+          [
+            les.id,
+            les.module_id,
+            les.title,
+            les.slug,
+            les.description || '',
+            les.type,
+            les.content || '',
+            les.video_url || '',
+            les.duration || '15 min',
+            les.order_index,
+            les.quiz_id || null,
+          ]
+        );
+      }
+    }
+
+    // 6. Quiz with secure is_correct answers
+    await query(
+      `INSERT INTO quizzes (id, lesson_id, course_id, title, passing_score)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (id) DO UPDATE
+       SET title = EXCLUDED.title,
+           passing_score = EXCLUDED.passing_score`,
+      ['quiz-react-1', 'les-3-2', 'course-1', 'Evaluación de Certificación: React desde Cero', 70]
+    );
+
+    const questions = [
       {
         id: 'q-1',
         question: '¿Cuál hook permite manejar estado local en un componente funcional de React?',
         options: [
-          { id: 'opt-1-1', option_text: 'useEffect', is_correct: false },
-          { id: 'opt-1-2', option_text: 'useState', is_correct: true },
-          { id: 'opt-1-3', option_text: 'useMemo', is_correct: false },
-          { id: 'opt-1-4', option_text: 'useRef', is_correct: false },
+          { id: 'opt-1-1', text: 'useEffect', is_correct: false },
+          { id: 'opt-1-2', text: 'useState', is_correct: true },
+          { id: 'opt-1-3', text: 'useMemo', is_correct: false },
+          { id: 'opt-1-4', text: 'useRef', is_correct: false },
         ],
       },
       {
         id: 'q-2',
         question: '¿Qué es React?',
         options: [
-          { id: 'opt-2-1', option_text: 'Un framework backend para Node.js', is_correct: false },
-          { id: 'opt-2-2', option_text: 'Una librería JavaScript declarativa para interfaces de usuario', is_correct: true },
-          { id: 'opt-2-3', option_text: 'Un motor de base de datos relacional', is_correct: false },
-          { id: 'opt-2-4', option_text: 'Un sistema operativo para servidores', is_correct: false },
+          { id: 'opt-2-1', text: 'Un framework backend para Node.js', is_correct: false },
+          { id: 'opt-2-2', text: 'Una librería JavaScript declarativa para interfaces de usuario', is_correct: true },
+          { id: 'opt-2-3', text: 'Un motor de base de datos relacional', is_correct: false },
+          { id: 'opt-2-4', text: 'Un sistema operativo para servidores', is_correct: false },
         ],
       },
       {
         id: 'q-3',
         question: '¿Cómo se pasan datos de un componente padre a un componente hijo en React?',
         options: [
-          { id: 'opt-3-1', option_text: 'A través de Props (Propiedades)', is_correct: true },
-          { id: 'opt-3-2', option_text: 'Mediante variables globales en window', is_correct: false },
-          { id: 'opt-3-3', option_text: 'Modificando directamente el DOM real', is_correct: false },
-          { id: 'opt-3-4', option_text: 'No es posible pasar datos entre componentes', is_correct: false },
+          { id: 'opt-3-1', text: 'A través de Props (Propiedades)', is_correct: true },
+          { id: 'opt-3-2', text: 'Mediante variables globales en window', is_correct: false },
+          { id: 'opt-3-3', text: 'Modificando directamente el DOM real', is_correct: false },
+          { id: 'opt-3-4', text: 'No es posible pasar datos entre componentes', is_correct: false },
         ],
       },
       {
         id: 'q-4',
         question: '¿Para qué sirve el hook useEffect?',
         options: [
-          { id: 'opt-4-1', option_text: 'Para ejecutar efectos secundarios (peticiones API, timers, suscripciones)', is_correct: true },
-          { id: 'opt-4-2', option_text: 'Para estilizar elementos con CSS únicamente', is_correct: false },
-          { id: 'opt-4-3', option_text: 'Para crear bases de datos en memoria', is_correct: false },
-          { id: 'opt-4-4', option_text: 'Para reiniciar la máquina del cliente', is_correct: false },
+          { id: 'opt-4-1', text: 'Para ejecutar efectos secundarios (peticiones API, timers, suscripciones)', is_correct: true },
+          { id: 'opt-4-2', text: 'Para estilizar elementos con CSS únicamente', is_correct: false },
+          { id: 'opt-4-3', text: 'Para crear bases de datos en memoria', is_correct: false },
+          { id: 'opt-4-4', text: 'Para reiniciar la máquina del cliente', is_correct: false },
         ],
       },
       {
         id: 'q-5',
         question: '¿Qué ventaja principal ofrece el Virtual DOM en React?',
         options: [
-          { id: 'opt-5-1', option_text: 'Calcula diferencias en memoria y actualiza sólo los nodos modificados en el DOM real', is_correct: true },
-          { id: 'opt-5-2', option_text: 'Reemplaza completamente HTML y CSS por código binario', is_correct: false },
-          { id: 'opt-5-3', option_text: 'Ejecuta consultas SQL en el navegador', is_correct: false },
-          { id: 'opt-5-4', option_text: 'Aumenta el consumo de memoria en 500%', is_correct: false },
+          { id: 'opt-5-1', text: 'Calcula diferencias en memoria y actualiza sólo los nodos modificados en el DOM real', is_correct: true },
+          { id: 'opt-5-2', text: 'Reemplaza completamente HTML y CSS por código binario', is_correct: false },
+          { id: 'opt-5-3', text: 'Ejecuta consultas SQL en el navegador', is_correct: false },
+          { id: 'opt-5-4', text: 'Aumenta el consumo de memoria en 500%', is_correct: false },
         ],
       },
-    ],
-  };
+    ];
 
-  quizService.seedQuiz(reactQuiz);
+    for (const [qIdx, q] of questions.entries()) {
+      await query(
+        `INSERT INTO quiz_questions (id, quiz_id, question, order_index)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (id) DO UPDATE SET question = EXCLUDED.question`,
+        [q, 'quiz-react-1', q.question, qIdx + 1]
+      );
 
-  // 6. Sample Initial Enrollment & Progress for demo student
-  enrollmentService.seedEnrollment({
-    id: 'enr-1',
-    user_id: 'user-student-1',
-    course_id: 'course-1',
-    status: 'active',
-    enrolled_at: '2026-02-01T10:00:00Z',
-    completed_at: null,
-  });
+      for (const [optIdx, opt] of q.options.entries()) {
+        await query(
+          `INSERT INTO quiz_options (id, question_id, option_text, is_correct, order_index)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (id) DO UPDATE SET option_text = EXCLUDED.option_text, is_correct = EXCLUDED.is_correct`,
+          [opt.id, q.id, opt.text, opt.is_correct, optIdx + 1]
+        );
+      }
+    }
 
-  ['les-1-1', 'les-1-2', 'les-1-3', 'les-2-1', 'les-2-2', 'les-2-3'].forEach((lesId) => {
-    progressService.seedProgress({
-      id: `prog-${lesId}`,
-      user_id: 'user-student-1',
-      lesson_id: lesId,
-      completed: true,
-      completed_at: new Date().toISOString(),
-    });
-  });
+    // 7. Enrollment & Progress for demo student
+    await query(
+      `INSERT INTO enrollments (id, user_id, course_id, status, enrolled_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (user_id, course_id) DO NOTHING`,
+      ['enr-1', 'user-student-1', 'course-1', 'active']
+    );
 
-  console.log('✅ [Seed] Initial dataset seeded successfully into backend services.');
+    const initialLessonProgress = ['les-1-1', 'les-1-2', 'les-1-3', 'les-2-1', 'les-2-2', 'les-2-3'];
+    for (const lesId of initialLessonProgress) {
+      await query(
+        `INSERT INTO lesson_progress (id, user_id, lesson_id, completed, completed_at)
+         VALUES ($1, $2, $3, true, NOW())
+         ON CONFLICT (user_id, lesson_id) DO NOTHING`,
+        [`prog-${lesId}`, 'user-student-1', lesId]
+      );
+    }
+
+    console.log('✅ [Seed] Database tables and initial seed dataset configured successfully.');
+  } catch (err) {
+    console.error('⚠️ [Seed Note]', err.message);
+  }
 }
 
 // Standalone execution: node src/db/seed.js
 if (process.argv[1]?.endsWith('seed.js')) {
   seedInitialData().then(() => {
-    console.log('🎉 Seed completed.');
+    console.log('🎉 Seed process finished.');
     process.exit(0);
   });
 }

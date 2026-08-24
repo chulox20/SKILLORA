@@ -1,35 +1,22 @@
-import { pool, isDbConnected } from '../db/database.js';
+import { query } from '../db/database.js';
 import { courseService } from './courseService.js';
 
 export const adminService = {
-  // Get platform dashboard metrics (Section 22 & 33)
+  // Get platform dashboard metrics
   async getDashboardStats() {
-    let totalStudents = 1284;
-    let publishedCourses = 24;
-    let totalEnrollments = 3842;
-    let completedCourses = 1562;
-    let totalCertificates = 1562;
-    let coursesSummary = [];
+    const studentsRes = await query(`SELECT COUNT(*) FROM users WHERE role = 'student'`);
+    const pubCoursesRes = await query(`SELECT COUNT(*) FROM courses WHERE status = 'published'`);
+    const enrollmentsRes = await query(`SELECT COUNT(*) FROM enrollments`);
+    const certsRes = await query(`SELECT COUNT(*) FROM certificates`);
 
-    if (isDbConnected()) {
-      try {
-        const studentsRes = await pool.query(`SELECT COUNT(*) FROM users WHERE role = 'student'`);
-        const pubCoursesRes = await pool.query(`SELECT COUNT(*) FROM courses WHERE status = 'published'`);
-        const enrollmentsRes = await pool.query(`SELECT COUNT(*) FROM enrollments`);
-        const certsRes = await pool.query(`SELECT COUNT(*) FROM certificates`);
-
-        totalStudents = parseInt(studentsRes.rows[0].count) + 1280;
-        publishedCourses = parseInt(pubCoursesRes.rows[0].count) + 18;
-        totalEnrollments = parseInt(enrollmentsRes.rows[0].count) + 3840;
-        completedCourses = parseInt(certsRes.rows[0].count) + 1560;
-        totalCertificates = parseInt(certsRes.rows[0].count) + 1560;
-      } catch (err) {
-        // Fallback gracefully
-      }
-    }
+    const totalStudents = parseInt(studentsRes.rows[0]?.count || 0, 10);
+    const publishedCourses = parseInt(pubCoursesRes.rows[0]?.count || 0, 10);
+    const totalEnrollments = parseInt(enrollmentsRes.rows[0]?.count || 0, 10);
+    const completedCourses = parseInt(certsRes.rows[0]?.count || 0, 10);
+    const totalCertificates = parseInt(certsRes.rows[0]?.count || 0, 10);
 
     const allCourses = await courseService.getCourses({ includeAllForAdmin: true });
-    coursesSummary = allCourses.map((c) => ({
+    const coursesSummary = allCourses.map((c) => ({
       id: c.id,
       title: c.title,
       category: c.category_name,
@@ -48,67 +35,63 @@ export const adminService = {
     };
   },
 
-  // Get Students List (Section 28)
+  // Get Students List
   async getStudents() {
-    let users = [];
+    const result = await query(
+      `SELECT u.id, u.full_name, u.email, u.avatar_url, u.phone, u.bio, u.created_at,
+              COUNT(DISTINCT e.id) AS enrolled_courses_count,
+              COUNT(DISTINCT c.id) AS certificates_count
+       FROM users u
+       LEFT JOIN enrollments e ON e.user_id = u.id
+       LEFT JOIN certificates c ON c.user_id = u.id
+       WHERE u.role = 'student'
+       GROUP BY u.id
+       ORDER BY u.created_at DESC`
+    );
 
-    if (isDbConnected()) {
-      const result = await pool.query(
-        `SELECT id, full_name, email, avatar_url, phone, bio, created_at FROM users WHERE role = 'student' ORDER BY created_at DESC`
-      );
-      users = result.rows;
-    } else {
-      users = [
-        {
-          id: 'user-student-1',
-          full_name: 'Jesús Figueroa',
-          email: 'estudiante@skillora.edu',
-          avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-          phone: '+1 (555) 234-5678',
-          created_at: '2026-01-15T10:00:00Z',
-        },
-      ];
-    }
-
-    return users.map((u) => ({
+    return result.rows.map((u) => ({
       ...u,
-      enrolledCoursesCount: 1,
-      completedCoursesCount: 1,
-      certificatesCount: 1,
-      enrolledCourses: [
-        {
-          courseId: 'course-1',
-          title: 'React desde cero',
-          enrolled_at: '2026-02-01T10:00:00Z',
-        },
-      ],
+      enrolledCoursesCount: parseInt(u.enrolled_courses_count || 0, 10),
+      certificatesCount: parseInt(u.certificates_count || 0, 10),
     }));
   },
 
-  // Get single student detailed academic transcript
+  // Get single student detailed academic profile
   async getStudentAcademicProfile(studentId) {
-    const students = await this.getStudents();
-    const student = students.find((s) => s.id === studentId) || students[0];
+    const userRes = await query(
+      `SELECT id, full_name, email, avatar_url, phone, bio, created_at FROM users WHERE id = $1`,
+      [studentId]
+    );
+    const student = userRes.rows[0];
+    if (!student) return null;
+
+    const certsRes = await query(
+      `SELECT * FROM certificates WHERE user_id = $1 ORDER BY issued_at DESC`,
+      [studentId]
+    );
+
+    const attemptsRes = await query(
+      `SELECT a.*, q.title AS quiz_title
+       FROM quiz_attempts a
+       JOIN quizzes q ON q.id = a.quiz_id
+       WHERE a.user_id = $1
+       ORDER BY a.completed_at DESC`,
+      [studentId]
+    );
+
+    const enrollmentsRes = await query(
+      `SELECT e.*, c.title AS course_title
+       FROM enrollments e
+       JOIN courses c ON c.id = e.course_id
+       WHERE e.user_id = $1`,
+      [studentId]
+    );
 
     return {
       ...student,
-      certificates: [
-        {
-          id: 'cert-1',
-          course_title: 'REACT DESDE CERO',
-          certificate_code: 'SKL-2026-00042',
-          issued_at: '2026-08-23T18:00:00Z',
-        },
-      ],
-      attempts: [
-        {
-          id: 'att-1',
-          quiz_title: 'Evaluación de Certificación: React desde Cero',
-          score: 80,
-          passed: true,
-          completed_at: '2026-08-23T17:55:00Z',
-        },
-      ],
+      enrolledCourses: enrollmentsRes.rows,
+      certificates: certsRes.rows,
+      attempts: attemptsRes.rows,
     };
   },
 };
