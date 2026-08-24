@@ -1,12 +1,12 @@
 # 🎓 SKILLORA — Aprende. Practica. Evoluciona.
 
-> Plataforma LMS (*Learning Management System*) fullstack moderna, desacoplada y de alto rendimiento. Desarrollada con **React 18 + Vite** en el frontend y un **Backend propio en Node.js + Express + PostgreSQL + JWT + bcrypt + Zod** (sin dependencias de BaaS/Supabase).
+> Plataforma LMS (*Learning Management System*) fullstack moderna, desacoplada y lista para producción. Desarrollada con **React 18 + Vite** en el frontend y un **Backend propio en Node.js + Express + PostgreSQL + JWT + bcrypt + Zod** (completamente independiente de servicios BaaS / Supabase).
 
 ---
 
-## 🏛️ Nueva Arquitectura del Sistema
+## 🏛️ Arquitectura del Sistema
 
-Skillora implementa una arquitectura cliente-servidor desacoplada basada en servicios REST y autenticación por tokens JWT:
+Skillora implementa una arquitectura cliente-servidor desacoplada basada en servicios REST, validación estricta en tiempo de ejecución y autenticación mediante JSON Web Tokens:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -21,12 +21,13 @@ Skillora implementa una arquitectura cliente-servidor desacoplada basada en serv
 │                      BACKEND (API REST)                     │
 │               Node.js + Express (ES Modules)                │
 │                                                             │
-│  ├── 🔐 Autenticación & Autorización (JWT + bcryptjs)        │
+│  ├── 🔐 Autenticación & Hashing Seguro (JWT + bcryptjs)     │
 │  ├── 🛡️  Control de Acceso Basado en Roles (Student / Admin) │
-│  ├── ⚙️  Validación Estricta de Esquemas con Zod            │
 │  ├── 🚦 Rate Limiting en Endpoints Sensibles                │
-│  ├── 🧠 Lógica de Negocio & Motor de Evaluación Anti-Cheat  │
-│  └── 📜 Generación & Verificación de Certificados            │
+│  ├── ⚙️  Validación Estricta de Esquemas con Zod            │
+│  ├── 🧠 Motor de Evaluación Anti-Cheat en Servidor          │
+│  ├── 📜 Validación Estricta de Certificaciones (UUID)       │
+│  └── 🚫 Fail-Fast Config: Cero secretos por defecto         │
 └──────────────────────────────┬──────────────────────────────┘
                                │
                                │ PostgreSQL Driver (pg.Pool)
@@ -41,7 +42,7 @@ Skillora implementa una arquitectura cliente-servidor desacoplada basada en serv
 
 ## 📁 Estructura del Repositorio
 
-El proyecto está organizado en dos carpetas independientes:
+El proyecto está organizado en dos módulos independientes y desacoplados:
 
 ```
 SKILLORA/
@@ -63,12 +64,12 @@ SKILLORA/
 │   │   │   └── student/          # Dashboard alumno, mis cursos, aula virtual, certificados, perfil
 │   │   ├── routes/               # AppRoutes, ProtectedRoute y AdminRoute
 │   │   ├── services/
-│   │   │   ├── apiClient.js      # Cliente HTTP centralizado con inyección de JWT
-│   │   │   ├── authService.js    # Auth, registro, login y usuarios demo
+│   │   │   ├── apiClient.js      # Cliente HTTP centralizado con inyección automática de JWT
+│   │   │   ├── authService.js    # Auth, registro, login y tokens JWT
 │   │   │   ├── courseService.js  # Cursos, módulos y lecciones
 │   │   │   ├── enrollmentService.js # Inscripciones de alumnos
 │   │   │   ├── progressService.js   # Registro de lecciones completadas
-│   │   │   ├── quizService.js    # Consumo seguro de evaluaciones
+│   │   │   ├── quizService.js    # Consumo de evaluaciones
 │   │   │   ├── certificateService.js # Verificación y descarga de certificados
 │   │   │   └── adminService.js   # Métricas y fichas académicas
 │   │   ├── styles/               # Directivas de Tailwind CSS
@@ -82,8 +83,8 @@ SKILLORA/
 │
 ├── backend/                      # Servidor API REST
 │   ├── src/
-│   │   ├── config/               # Variables de entorno y configuración
-│   │   │   └── config.js
+│   │   ├── config/               # Variables de entorno con validación estricta
+│   │   │   └── config.js         # (Falla inmediatamente si falta JWT_SECRET o DATABASE_URL)
 │   │   ├── controllers/          # Controladores HTTP desacoplados
 │   │   │   ├── authController.js
 │   │   │   ├── courseController.js
@@ -108,22 +109,22 @@ SKILLORA/
 │   │   │   ├── certificateRoutes.js
 │   │   │   ├── adminRoutes.js
 │   │   │   └── index.js
-│   │   ├── services/             # Lógica de negocio y persistencia
+│   │   ├── services/             # Lógica de negocio y persistencia en PostgreSQL
 │   │   │   ├── authService.js
 │   │   │   ├── courseService.js
 │   │   │   ├── enrollmentService.js
 │   │   │   ├── progressService.js
 │   │   │   ├── quizService.js    # Motor de evaluación y protección anti-cheat
-│   │   │   ├── certificateService.js # Validación estricta de requisitos de certificación
+│   │   │   ├── certificateService.js # Emisión estricta (100% lecciones + quiz aprobado + inscripción)
 │   │   │   └── adminService.js
 │   │   ├── validators/           # Esquemas Zod para request bodies y params
 │   │   ├── utils/                # Utilidades de JWT y bcrypt
 │   │   │   ├── jwt.js
 │   │   │   └── password.js
 │   │   ├── db/
-│   │   │   ├── database.js       # Conexión Pool PostgreSQL (pg) y modo de resiliencia
+│   │   │   ├── database.js       # Pool de conexiones PostgreSQL (pg)
 │   │   │   ├── schema.sql        # Esquema DDL con 13 tablas relacionales e índices
-│   │   │   └── seed.js           # Script de sembrado de datos iniciales
+│   │   │   └── seed.js           # Script de creación de tablas y datos iniciales
 │   │   ├── app.js                # Configuración de Express, CORS y middlewares
 │   │   └── server.js             # Punto de entrada del servidor en puerto 4000
 │   ├── package.json
@@ -141,8 +142,8 @@ SKILLORA/
 ### 🔐 Autenticación (`/api/auth`)
 | Método | Endpoint | Acceso | Descripción |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/register` | Público | Registra nuevo estudiante (`role: 'student'`) y devuelve JWT |
-| `POST` | `/api/auth/login` | Público | Valida credenciales con `bcrypt.compare` y entrega JWT |
+| `POST` | `/api/auth/register` | Público | Registra nuevo estudiante (`role: 'student'`) y entrega token JWT |
+| `POST` | `/api/auth/login` | Público | Valida credenciales con `bcrypt.compare` y entrega token JWT |
 | `GET` | `/api/auth/me` | Autenticado | Obtiene perfil del usuario activo a partir del token JWT |
 | `PUT` | `/api/auth/profile` | Autenticado | Actualiza datos del perfil (nombre, avatar, teléfono, bio) |
 | `POST` | `/api/auth/forgot-password` | Público | Solicita restablecimiento de contraseña |
@@ -178,7 +179,7 @@ SKILLORA/
 ### 🧠 Evaluaciones & Quizzes (`/api/quizzes`)
 | Método | Endpoint | Acceso | Descripción |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/quizzes/:id` | Público | Obtiene preguntas del quiz (**`is_correct` nunca viaja al cliente**) |
+| `GET` | `/api/quizzes/:id` | **Inscrito / Admin** | Obtiene preguntas del quiz (**`is_correct` nunca viaja al cliente**) |
 | `POST` | `/api/quizzes/:id/submit` | Autenticado | Envía respuestas; el servidor evalúa, puntúa y registra intento |
 | `GET` | `/api/quizzes/:id/attempts` | Autenticado | Historial de intentos del usuario |
 | `POST` | `/api/quizzes` | **Admin** | Crea o actualiza evaluación con respuestas correctas |
@@ -187,8 +188,8 @@ SKILLORA/
 | Método | Endpoint | Acceso | Descripción |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/certificates` | Autenticado | Lista certificados obtenidos por el usuario |
-| `GET` | `/api/certificates/:code` | Público | Verificación pública mediante código oficial `SKL-YYYY-XXXXX` |
-| `POST` | `/api/certificates` | Autenticado | Emite certificado tras validar 100% de lecciones + quiz aprobado |
+| `GET` | `/api/certificates/:code` | Público | Verificación pública mediante código oficial `SKL-YYYY-XXXXXXXX` |
+| `POST` | `/api/certificates` | Autenticado | Emite certificado tras validar 100% de lecciones + quiz aprobado + inscripción |
 
 ### 👨💼 Panel de Administración (`/api/admin`)
 | Método | Endpoint | Acceso | Descripción |
@@ -201,7 +202,7 @@ SKILLORA/
 
 ## 🗄️ Esquema de Base de Datos PostgreSQL (13 Tablas)
 
-El archivo `backend/src/db/schema.sql` contiene la definición DDL completa:
+El archivo `backend/src/db/schema.sql` define la estructura relacional completa:
 
 1. `users`: Identidad, credenciales (`password_hash`), roles (`student`, `admin`), avatar, teléfono y biografía.
 2. `categories`: Áreas de conocimiento y slugs de navegación.
@@ -221,10 +222,15 @@ El archivo `backend/src/db/schema.sql` contiene la definición DDL completa:
 
 ## 🛡️ Seguridad y Buenas Prácticas
 
-- **Cero contraseñas en texto plano**: Hashing con `bcrypt` (10 rondas de salting).
-- **Control de Roles**: Middleware `requireRole('admin')` verificando claims en el token JWT.
-- **Protección Anti-Cheat en Quizzes**: `is_correct` se almacena y consulta únicamente en el backend.
-- **Emisión Estricta de Certificados**: El endpoint `POST /api/certificates` verifica en base de datos que el usuario completó el 100% de las lecciones del curso y aprobó el quiz con $\ge 70\%$ antes de expedir el código oficial.
+- **Cero Secretos Hardcodeados**: `config.js` implementa validación estricta en el arranque (`fail-fast`). No existen claves de respaldo en el código fuente.
+- **Cero Contraseñas en Texto Plano**: Hashing seguro con `bcryptjs` (10 rondas de salting).
+- **Protección Anti-Cheat en Evaluaciones**: La columna `is_correct` reside y se procesa únicamente en PostgreSQL. El cliente solo recibe identificadores de preguntas y opciones.
+- **Acceso Restringido a Quizzes**: El endpoint `GET /api/quizzes/:id` exige que el alumno esté inscrito en el curso correspondiente o sea administrador.
+- **Emisión Blindada de Certificados**: `POST /api/certificates` verifica directamente en base de datos la combinación de:
+  1. Inscripción activa en `enrollments`.
+  2. 100% de lecciones completadas en `lesson_progress`.
+  3. Intento con calificación aprobatoria ($\ge 70\%$) en `quiz_attempts`.
+- **Generación Basada en UUID**: Códigos de verificación únicos derivados de identificadores criptográficos `crypto.randomUUID()` (`SKL-2026-XXXXXXXX`).
 - **Rate Limiting**: `express-rate-limit` protegiendo los endpoints de autenticación contra ataques de fuerza bruta.
 - **CORS Configurado**: Restringido a los orígenes autorizados del frontend (`http://localhost:3000`, `http://localhost:5173`).
 
@@ -238,7 +244,7 @@ git clone https://github.com/chulox20/SKILLORA.git
 cd SKILLORA
 ```
 
-### 2. Instalar todas las dependencias
+### 2. Instalar dependencias
 ```bash
 npm run install:all
 ```
@@ -250,7 +256,7 @@ npm run install:all
 PORT=4000
 NODE_ENV=development
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/skillora
-JWT_SECRET=skillora_super_secure_jwt_secret_key_2026_edu
+JWT_SECRET=tu_clave_secreta_jwt_larga_y_segura_aqui
 JWT_EXPIRES_IN=7d
 FRONTEND_URL=http://localhost:3000,http://localhost:5173
 ```
@@ -260,26 +266,24 @@ FRONTEND_URL=http://localhost:3000,http://localhost:5173
 VITE_API_URL=http://localhost:4000/api
 ```
 
-### 4. Sembrar Datos de Prueba (Seed)
+### 4. Inicializar y Sembrar la Base de Datos
 ```bash
 npm run seed
 ```
 
 ### 5. Iniciar Servidores de Desarrollo
 
-**Opción A — Ejecutar ambos servidores:**
+**Terminal 1 — Backend API:**
 ```bash
-# En una terminal:
 npm run dev:backend
-
-# En otra terminal:
-npm run dev:frontend
+# Servidor escuchando en http://localhost:4000/api
 ```
 
-**URLs Locales:**
-- 🌐 **Frontend SPA**: [http://localhost:3000](http://localhost:3000)
-- 🔌 **Backend REST API**: [http://localhost:4000/api](http://localhost:4000/api)
-- 🩺 **Health Check**: [http://localhost:4000/api/health](http://localhost:4000/api/health)
+**Terminal 2 — Frontend SPA:**
+```bash
+npm run dev:frontend
+# Aplicación lista en http://localhost:3000
+```
 
 ---
 
