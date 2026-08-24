@@ -1,10 +1,12 @@
 # 🎓 SKILLORA — Aprende. Practica. Evoluciona.
 
-> Plataforma LMS (*Learning Management System*) fullstack de alto rendimiento construida con una arquitectura profesional desacoplada: **Frontend en React 18 + Vite** y un **Backend propio en Node.js + Express + PostgreSQL + JWT + bcrypt + Zod**.
+> Plataforma LMS (*Learning Management System*) fullstack moderna, desacoplada y de alto rendimiento. Desarrollada con **React 18 + Vite** en el frontend y un **Backend propio en Node.js + Express + PostgreSQL + JWT + bcrypt + Zod** (sin dependencias de BaaS/Supabase).
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+## 🏛️ Nueva Arquitectura del Sistema
+
+Skillora implementa una arquitectura cliente-servidor desacoplada basada en servicios REST y autenticación por tokens JWT:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -12,12 +14,12 @@
 │   React 18 + Vite + Tailwind CSS + Framer Motion + Lucide   │
 └──────────────────────────────┬──────────────────────────────┘
                                │
-                               │ HTTP / REST API
+                               │ HTTP / REST API (JSON)
                                │ Headers: Authorization: Bearer <JWT>
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      BACKEND (API REST)                     │
-│               Node.js + Express + ES Modules                │
+│               Node.js + Express (ES Modules)                │
 │                                                             │
 │  ├── 🔐 Autenticación & Autorización (JWT + bcryptjs)        │
 │  ├── 🛡️  Control de Acceso Basado en Roles (Student / Admin) │
@@ -37,54 +39,98 @@
 
 ---
 
-## 📁 Estructura del Proyecto
+## 📁 Estructura del Repositorio
+
+El proyecto está organizado en dos carpetas independientes:
 
 ```
 SKILLORA/
-├── frontend/                     # Aplicación Cliente React + Vite
-│   ├── public/
+├── frontend/                     # Aplicación Cliente (SPA)
+│   ├── public/                   # Favicon y recursos estáticos
 │   ├── src/
-│   │   ├── components/           # Componentes UI, Cursos, Aula, Admin, Quizzes
-│   │   ├── contexts/             # AuthContext (JWT) y NotificationContext
-│   │   ├── pages/                # Vistas Públicas, Estudiante y Administrador
-│   │   ├── routes/               # AppRoutes, ProtectedRoute, AdminRoute
+│   │   ├── components/           # Componentes UI reutilizables
+│   │   │   ├── admin/            # Editor de temarios, modal de quizzes, detalles de alumnos
+│   │   │   ├── common/           # Botones, tarjetas, modales, badges, skeletons
+│   │   │   ├── courses/          # Tarjetas de catálogo, filtros, temario y hero
+│   │   │   ├── layout/           # Navbar, Footer, StudentLayout, AdminLayout
+│   │   │   ├── learning/         # Reproductor de video, lector markdown, barra lateral
+│   │   │   └── quizzes/          # Tarjetas de preguntas y modal de resultados
+│   │   ├── contexts/             # AuthContext (JWT) y NotificationContext (Toasts)
+│   │   ├── pages/                # Vistas de la aplicación
+│   │   │   ├── admin/            # Dashboard admin, cursos, quizzes, estudiantes, categorías
+│   │   │   ├── auth/             # Login, Registro y Recuperación
+│   │   │   ├── public/           # Home, Catálogo y Detalle de Curso
+│   │   │   └── student/          # Dashboard alumno, mis cursos, aula virtual, certificados, perfil
+│   │   ├── routes/               # AppRoutes, ProtectedRoute y AdminRoute
 │   │   ├── services/
 │   │   │   ├── apiClient.js      # Cliente HTTP centralizado con inyección de JWT
-│   │   │   ├── authService.js    # Auth, perfiles y usuarios demo
-│   │   │   ├── courseService.js  # Catálogo, cursos, módulos y lecciones
-│   │   │   ├── enrollmentService.js
-│   │   │   ├── progressService.js
+│   │   │   ├── authService.js    # Auth, registro, login y usuarios demo
+│   │   │   ├── courseService.js  # Cursos, módulos y lecciones
+│   │   │   ├── enrollmentService.js # Inscripciones de alumnos
+│   │   │   ├── progressService.js   # Registro de lecciones completadas
 │   │   │   ├── quizService.js    # Consumo seguro de evaluaciones
-│   │   │   ├── certificateService.js
+│   │   │   ├── certificateService.js # Verificación y descarga de certificados
 │   │   │   └── adminService.js   # Métricas y fichas académicas
-│   │   ├── styles/               # Tailwind CSS y directivas
-│   │   ├── utils/                # Generadores de PDF/PNG y formateadores
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── package.json
+│   │   ├── styles/               # Directivas de Tailwind CSS
+│   │   ├── utils/                # Generador de PDF/PNG (jsPDF + html2canvas) y formateadores
+│   │   ├── App.jsx               # Enrutador principal y Providers
+│   │   └── main.jsx              # Punto de entrada de React
+│   ├── package.json              # Dependencias del frontend (sin Supabase)
 │   ├── vite.config.js
-│   └── tailwind.config.js
+│   ├── tailwind.config.js
+│   └── .env.example
 │
-├── backend/                      # Servidor API REST Node.js + Express
+├── backend/                      # Servidor API REST
 │   ├── src/
 │   │   ├── config/               # Variables de entorno y configuración
+│   │   │   └── config.js
 │   │   ├── controllers/          # Controladores HTTP desacoplados
-│   │   ├── middleware/           # authMiddleware, roleMiddleware, errorMiddleware, validate
-│   │   ├── routes/               # Rutas modulares (/auth, /courses, /quizzes, etc.)
+│   │   │   ├── authController.js
+│   │   │   ├── courseController.js
+│   │   │   ├── categoryController.js
+│   │   │   ├── enrollmentController.js
+│   │   │   ├── progressController.js
+│   │   │   ├── quizController.js
+│   │   │   ├── certificateController.js
+│   │   │   └── adminController.js
+│   │   ├── middleware/           # Middlewares de Express
+│   │   │   ├── authMiddleware.js # Extracción y verificación Bearer JWT
+│   │   │   ├── roleMiddleware.js # Control de acceso por roles (admin, student)
+│   │   │   ├── errorMiddleware.js# Manejo centralizado de errores
+│   │   │   └── validate.js       # Validación de esquemas Zod
+│   │   ├── routes/               # Rutas modulares montadas en /api
+│   │   │   ├── authRoutes.js
+│   │   │   ├── courseRoutes.js
+│   │   │   ├── categoryRoutes.js
+│   │   │   ├── enrollmentRoutes.js
+│   │   │   ├── progressRoutes.js
+│   │   │   ├── quizRoutes.js
+│   │   │   ├── certificateRoutes.js
+│   │   │   ├── adminRoutes.js
+│   │   │   └── index.js
 │   │   ├── services/             # Lógica de negocio y persistencia
-│   │   ├── validators/           # Esquemas Zod para requests
-│   │   ├── utils/                # Hashing con bcrypt y sign/verify JWT
+│   │   │   ├── authService.js
+│   │   │   ├── courseService.js
+│   │   │   ├── enrollmentService.js
+│   │   │   ├── progressService.js
+│   │   │   ├── quizService.js    # Motor de evaluación y protección anti-cheat
+│   │   │   ├── certificateService.js # Validación estricta de requisitos de certificación
+│   │   │   └── adminService.js
+│   │   ├── validators/           # Esquemas Zod para request bodies y params
+│   │   ├── utils/                # Utilidades de JWT y bcrypt
+│   │   │   ├── jwt.js
+│   │   │   └── password.js
 │   │   ├── db/
-│   │   │   ├── database.js       # Pool PostgreSQL y modo resiliente
-│   │   │   ├── schema.sql        # DDL con 13 tablas relacionales e índices
+│   │   │   ├── database.js       # Conexión Pool PostgreSQL (pg) y modo de resiliencia
+│   │   │   ├── schema.sql        # Esquema DDL con 13 tablas relacionales e índices
 │   │   │   └── seed.js           # Script de sembrado de datos iniciales
 │   │   ├── app.js                # Configuración de Express, CORS y middlewares
-│   │   └── server.js             # Punto de entrada HTTP
+│   │   └── server.js             # Punto de entrada del servidor en puerto 4000
 │   ├── package.json
 │   ├── .env.example
 │   └── .env
 │
-├── package.json                  # Scripts coordinados del repositorio
+├── package.json                  # Scripts raíz para coordinar frontend y backend
 └── README.md
 ```
 
@@ -106,7 +152,7 @@ SKILLORA/
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/courses` | Público | Lista cursos con filtros (categoría, nivel, duración, búsqueda, orden) |
 | `GET` | `/api/courses/:slug` | Público | Detalle completo de curso con módulos y lecciones |
-| `POST` | `/api/courses` | **Admin** | Crea un nuevo curso |
+| `POST` | `/api/courses` | **Admin** | Crea un nuevo curso con validación Zod |
 | `PUT` | `/api/courses/:id` | **Admin** | Actualiza metadatos y configuración del curso |
 | `DELETE` | `/api/courses/:id` | **Admin** | Elimina curso |
 | `POST` | `/api/courses/:id/duplicate` | **Admin** | Duplica un curso y su estructura de contenido |
@@ -153,21 +199,34 @@ SKILLORA/
 
 ---
 
-## 🗄️ Modelo de Datos PostgreSQL (13 Tablas)
+## 🗄️ Esquema de Base de Datos PostgreSQL (13 Tablas)
 
-1. `users`: Identidad, credenciales (`password_hash`), roles (`student`, `admin`), avatar y biografía.
-2. `categories`: Áreas de conocimiento y slugs de filtrado.
+El archivo `backend/src/db/schema.sql` contiene la definición DDL completa:
+
+1. `users`: Identidad, credenciales (`password_hash`), roles (`student`, `admin`), avatar, teléfono y biografía.
+2. `categories`: Áreas de conocimiento y slugs de navegación.
 3. `courses`: Catálogo con metadatos, nivel, duración, estado (`draft`, `published`, `archived`) y JSON de objetivos/requisitos.
 4. `course_modules`: Módulos temáticos por curso ordenados por `order_index`.
-5. `lessons`: Lecciones (`video`, `article`, `quiz`) con contenido, URL y duración.
+5. `lessons`: Lecciones (`video`, `article`, `quiz`) con contenido markdown, video URL y duración.
 6. `enrollments`: Inscripciones con restricción `UNIQUE(user_id, course_id)`.
 7. `lesson_progress`: Progreso granular con restricción `UNIQUE(user_id, lesson_id)`.
-8. `quizzes`: Cuestionarios vinculados con puntaje de aprobación (`passing_score`).
-9. `quiz_questions`: Preguntas por evaluación.
-10. `quiz_options`: Opciones con indicador protegido `is_correct`.
-11. `quiz_attempts`: Historial de calificaciones y estado de aprobación.
-12. `quiz_answers`: Registro de opciones elegidas y aciertos calculados en servidor.
-13. `certificates`: Certificados oficiales con restricción `UNIQUE(certificate_code)`.
+8. `quizzes`: Evaluaciones vinculadas a cursos o lecciones con puntaje de aprobación (`passing_score`).
+9. `quiz_questions`: Preguntas de opción múltiple por evaluación.
+10. `quiz_options`: Opciones de respuesta con indicador protegido `is_correct`.
+11. `quiz_attempts`: Historial de intentos con puntuación y estado (`passed`).
+12. `quiz_answers`: Registro detallado de respuestas evaluadas en el servidor.
+13. `certificates`: Certificados oficiales emitidos con restricción `UNIQUE(certificate_code)`.
+
+---
+
+## 🛡️ Seguridad y Buenas Prácticas
+
+- **Cero contraseñas en texto plano**: Hashing con `bcrypt` (10 rondas de salting).
+- **Control de Roles**: Middleware `requireRole('admin')` verificando claims en el token JWT.
+- **Protección Anti-Cheat en Quizzes**: `is_correct` se almacena y consulta únicamente en el backend.
+- **Emisión Estricta de Certificados**: El endpoint `POST /api/certificates` verifica en base de datos que el usuario completó el 100% de las lecciones del curso y aprobó el quiz con $\ge 70\%$ antes de expedir el código oficial.
+- **Rate Limiting**: `express-rate-limit` protegiendo los endpoints de autenticación contra ataques de fuerza bruta.
+- **CORS Configurado**: Restringido a los orígenes autorizados del frontend (`http://localhost:3000`, `http://localhost:5173`).
 
 ---
 
@@ -179,9 +238,8 @@ git clone https://github.com/chulox20/SKILLORA.git
 cd SKILLORA
 ```
 
-### 2. Instalar dependencias
+### 2. Instalar todas las dependencias
 ```bash
-# Instalar todo en frontend y backend
 npm run install:all
 ```
 
@@ -202,30 +260,32 @@ FRONTEND_URL=http://localhost:3000,http://localhost:5173
 VITE_API_URL=http://localhost:4000/api
 ```
 
-### 4. Sembrar la Base de Datos
+### 4. Sembrar Datos de Prueba (Seed)
 ```bash
 npm run seed
 ```
 
 ### 5. Iniciar Servidores de Desarrollo
 
-**Terminal 1 — Backend API:**
+**Opción A — Ejecutar ambos servidores:**
 ```bash
+# En una terminal:
 npm run dev:backend
-# Servidor escuchando en http://localhost:4000/api
+
+# En otra terminal:
+npm run dev:frontend
 ```
 
-**Terminal 2 — Frontend SPA:**
-```bash
-npm run dev:frontend
-# Aplicación lista en http://localhost:3000
-```
+**URLs Locales:**
+- 🌐 **Frontend SPA**: [http://localhost:3000](http://localhost:3000)
+- 🔌 **Backend REST API**: [http://localhost:4000/api](http://localhost:4000/api)
+- 🩺 **Health Check**: [http://localhost:4000/api/health](http://localhost:4000/api/health)
 
 ---
 
-## 👥 Cuentas Demo para Evaluación Rápida
+## 👥 Cuentas Demo de Acceso Rápido
 
-La aplicación cuenta con botones de **1-Click Demo** en la barra superior:
+El sistema incluye botones de **1-Click Demo** en la barra de navegación superior:
 
 - 👨🎓 **Estudiante Demo**: `estudiante@skillora.edu` / `password123`
 - 👨💼 **Administrador Demo**: `admin@skillora.edu` / `adminpassword`
@@ -234,4 +294,4 @@ La aplicación cuenta con botones de **1-Click Demo** en la barra superior:
 
 ## 📄 Licencia
 
-MIT License — Creado como plataforma LMS educativa moderna y modular.
+MIT License — Desarrollado como plataforma LMS educativa, moderna y modular.
